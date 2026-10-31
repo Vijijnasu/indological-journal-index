@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>पुराणम् — Purāṇa Journal Cumulative Index</title>
+<style>
+  :root { --bg: #f8f9fa; --card: #ffffff; --border: #d0d7de; --primary: #8b261d; --text: #1f2328; --muted: #57606a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Devanagari", serif; background: var(--bg); color: var(--text); line-height: 1.45; }
+  header { background: #2b1810; color: #f6f0dd; padding: 20px 24px; border-bottom: 3px solid #c59b27; }
+  .header-inner { max-width: 1350px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: 0.4px; }
+  .subtitle { font-size: 13px; color: #d8ccb8; margin-top: 4px; }
+  .dl-links a { color: #f6f0dd; text-decoration: none; font-size: 13px; border: 1px solid #8c7355; padding: 6px 12px; border-radius: 5px; margin-left: 8px; }
+  .dl-links a:hover { background: #3e261c; }
+  main { max-width: 1350px; margin: 20px auto; padding: 0 16px; }
+  .controls { display: grid; grid-template-columns: 1fr 180px 180px auto; gap: 10px; background: var(--card); padding: 14px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px; align-items: center; }
+  @media (max-width: 800px) { .controls { grid-template-columns: 1fr; } }
+  input, select { padding: 9px 12px; font-size: 14px; border: 1px solid var(--border); border-radius: 6px; font-family: inherit; width: 100%; }
+  .count-badge { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; padding: 0 8px; }
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { padding: 10px 12px; border-bottom: 1px solid #eaeef2; text-align: left; vertical-align: top; }
+  th { background: #f3efe6; color: #3b2314; font-weight: 700; position: sticky; top: 0; }
+  tr:hover { background: #fdfaf3; }
+  .sanskrit { font-size: 14.5px; color: #2b1810; }
+  .meta-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .tag { display: inline-block; padding: 2px 7px; font-size: 11px; border-radius: 10px; background: #eee8d5; color: #4b382a; }
+</style>
+</head>
+<body>
+<header>
+  <div class="dl-links">
+      <a href="https://github.com/YOUR_GITHUB_USERNAME/purana-index/issues" target="_blank">💬 Report Correction</a>
+      <a href="#" onclick="window.location.href='mailto:' + ['vijijnasu','proton.me'].join('@'); return false;">✉️ Contact</a>
+      <a href="purana_database.csv" download>⬇ Download CSV</a>
+      <a href="purana_database.json" download>⬇ Download JSON</a>
+  </div>
+</header>
+<main>
+  <div class="controls">
+    <input type="text" id="q" placeholder="Search topics, titles (English, IAST, or देवनागरी), authors, or years... (e.g., sahyadri, visnu, रामायण, Raghavan)" oninput="filterRows()">
+    <select id="catFilter" onchange="filterRows()">
+      <option value="">All Categories</option>
+    </select>
+    <select id="issueFilter" onchange="filterRows()">
+      <option value="">All Issues / Years</option>
+    </select>
+    <div class="count-badge" id="countLabel">Loading...</div>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:140px;">Issue & Year</th>
+          <th style="width:80px;">Pages</th>
+          <th>English / IAST Title</th>
+          <th>Sanskrit Title (देवनागरी)</th>
+          <th style="width:220px;">Author / Contributor</th>
+          <th style="width:110px;">Category</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+<script>
+let rows = [];
+function norm(s) {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+function esc(s) {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+async function loadData() {
+  const res = await fetch("purana_database.json");
+  rows = await res.json();
+  rows.forEach(r => {
+    r._norm = norm(`${r.issue_id} ${r.year} ${r.vol_roman} ${r.title_english_or_iast} ${r.author} ${r.affiliation} ${r.notes}`);
+    r._dev = `${r.title_sanskrit || ""} ${r.author || ""} ${r.festival_issue_name || ""}`;
+  });
+  const cats = [...new Set(rows.map(r => r.category).filter(Boolean))].sort();
+  document.getElementById("catFilter").innerHTML = '<option value="">All Categories</option>' +
+    cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  const issues = [...new Set(rows.map(r => r.issue_id).filter(Boolean))];
+  document.getElementById("issueFilter").innerHTML = '<option value="">All Issues (' + issues.length + ')</option>' +
+    issues.map(i => `<option value="${esc(i)}">${esc(i)}</option>`).join("");
+  filterRows();
+}
+function filterRows() {
+  const rawQ = document.getElementById("q").value.trim();
+  const terms = norm(rawQ).split(/\s+/).filter(Boolean);
+  const cat = document.getElementById("catFilter").value;
+  const iss = document.getElementById("issueFilter").value;
+  const matched = rows.filter(r => {
+    if (cat && r.category !== cat) return false;
+    if (iss && r.issue_id !== iss) return false;
+    if (!rawQ) return true;
+    return terms.every(t => r._norm.includes(t)) || r._dev.includes(rawQ);
+  });
+  document.getElementById("countLabel").textContent = `${matched.length} of ${rows.length} entries`;
+  document.getElementById("tbody").innerHTML = matched.map(r => `
+    <tr>
+      <td><strong>${esc(r.year)}</strong> (Vol. ${esc(r.vol_roman || '?')}, No. ${esc(r.issue_no || '?')})<div class="meta-sub">${esc(r.publication_date || '')} ${esc(r.festival_issue_name || '')}</div></td>
+      <td>${esc(r.pages || '—')}</td>
+      <td>${r.title_english_or_iast ? esc(r.title_english_or_iast) : '<span style="color:#aaa">—</span>'}${r.notes ? `<div class="meta-sub">${esc(r.notes)}</div>` : ''}</td>
+      <td class="sanskrit">${r.title_sanskrit ? esc(r.title_sanskrit) : '<span style="color:#aaa">—</span>'}</td>
+      <td><strong>${esc(r.author || '')}</strong>${r.contributor_role && r.contributor_role !== 'Author' ? ` <span class="meta-sub">(${esc(r.contributor_role)})</span>` : ''}<div class="meta-sub">${esc(r.affiliation || '')}</div></td>
+      <td><span class="tag">${esc(r.category || '')}</span>${r.section && r.section !== 'Main' ? `<div class="meta-sub">${esc(r.section)}</div>` : ''}</td>
+    </tr>
+  `).join("");
+}
+loadData();
+</script>
+</body>
+</html>
